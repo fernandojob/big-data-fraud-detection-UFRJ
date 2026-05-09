@@ -15,8 +15,9 @@ venv/
 # =========================
 output/
 *.parquet
-*.json
 *.csv
+*.ndjson
+*.jsonl
 
 # Logs
 *.log
