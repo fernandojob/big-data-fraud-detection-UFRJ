@@ -1,0 +1,184 @@
+// Variáveis de Estilo
+$red-danger: #e74c3c;
+$blue-info: #3498db;
+$dark-bg: #2c3e50;
+$gray-text: #7f8c8d;
+$white: #ffffff;
+$radius: 16px;
+
+.dashboard-container {
+  padding: 2rem;
+  background-color: #f4f7f9;
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+
+  .dashboard-header {
+    margin-bottom: 2.5rem;
+    
+    .header-content {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      
+      h1 { color: $dark-bg; margin: 0; font-size: 2rem; font-weight: 800; }
+      
+      .pipeline-badge {
+        background: #d1d5db;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+    }
+    p { color: $gray-text; margin-top: 8px; font-size: 1.1rem; }
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+
+    .card {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 1.5rem;
+      border-radius: $radius;
+      color: $white;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+      transition: transform 0.3s ease;
+
+      &:hover { transform: translateY(-5px); }
+      
+      .card-icon { font-size: 2.5rem; opacity: 0.8; }
+      h3 { margin: 0; font-size: 0.9rem; font-weight: 500; opacity: 0.9; }
+      .count { font-size: 1.8rem; font-weight: 800; margin: 5px 0; }
+      
+      &.alert { background: linear-gradient(135deg, $red-danger, #c0392b); }
+      &.info { background: linear-gradient(135deg, $blue-info, #2980b9); }
+      &.secondary { background: linear-gradient(135deg, $dark-bg, #1a252f); }
+    }
+  }
+
+  .chart-section {
+    background: $white;
+    padding: 1.5rem;
+    border-radius: $radius;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    margin-bottom: 2.5rem;
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      h3 { margin: 0; color: $dark-bg; }
+      
+      .status-live {
+        color: #27ae60;
+        font-size: 0.8rem;
+        font-weight: bold;
+        &::before { content: "● "; animation: blink 1.5s infinite; }
+      }
+    }
+
+    .canvas-wrapper {
+      height: 350px; 
+    }
+  }
+
+  .table-section {
+    background: $white;
+    border-radius: $radius;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+
+    .table-responsive {
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        
+        thead {
+          background: #f8fafc;
+          th { padding: 1rem; text-align: left; color: $gray-text; font-size: 0.85rem; text-transform: uppercase; }
+        }
+
+        tbody tr {
+          border-top: 1px solid #f1f5f9;
+          &:hover { background: #fdfdfd; }
+          td { padding: 1rem; color: $dark-bg; }
+          .font-mono { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
+          .font-bold { font-weight: 700; }
+        }
+      }
+    }
+  }
+
+  .badge {
+    background: #fff5f5;
+    color: $red-danger;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid #fed7d7;
+  }
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+
+  .page-info {
+    color: $dark-bg;
+    font-size: 0.9rem;
+    strong { color: $red-danger; }
+    small { display: block; color: $gray-text; text-align: center; font-size: 0.7rem; }
+  }
+
+  .btn-pag {
+    padding: 8px 16px;
+    border: 1px solid #e2e8f0;
+    background: $white;
+    border-radius: 8px;
+    font-weight: 600;
+    color: $dark-bg;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+      background: $dark-bg;
+      color: $white;
+      border-color: $dark-bg;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.badge {
+  &.alta_suspeita {
+    background: #fdecea;
+    color: #e74c3c;
+  }
+
+  &.media_suspeita {
+    background: #fff4e5;
+    color: #f39c12;
+  }
+}
