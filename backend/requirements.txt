@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+minio
+pyspark
+boto3

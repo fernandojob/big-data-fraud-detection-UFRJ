@@ -1,0 +1,40 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ambiente virtual
+venv/
+.env/
+
+# =========================
+# Spark / Big Data
+# =========================
+output/
+*.parquet
+*.json
+*.csv
+
+# Logs
+*.log
+
+# =========================
+# Sistema operacional
+# =========================
+.DS_Store
+
+# =========================
+# IDEs
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# Angular (caso esteja no mesmo repo)
+# =========================
+node_modules/
+dist/
+.angular/
