@@ -5,8 +5,7 @@ import { Chart, registerables } from 'chart.js';
 import { FraudeService } from '../../services/fraude.service';
 
 // utils
-import { formatarStatus, formatarPais, formatarData } from '../../utils/formatters';
-import { Fraude } from '../../models/fraude.model';
+import { formatarPais, formatarData, formatarMotivo } from '../../utils/formatters';
 
 Chart.register(...registerables);
 
@@ -21,8 +20,10 @@ export class DashboardComponent implements OnInit {
 
   @ViewChild('graficoCanvas') graficoCanvas!: ElementRef<HTMLCanvasElement>;
 
-  fraudes: Fraude[] = [];
+  fraudes: any[] = [];
   totalValor: number = 0;
+  alertasCriticos: number = 0;
+  usuariosImpactados: number = 0;
   chart: any;
 
   paginaAtual: number = 1;
@@ -60,12 +61,17 @@ export class DashboardComponent implements OnInit {
       next: (data: any[]) => {
         this.fraudes = data.map(item => ({
           ...item,
-          statusFormatado: formatarStatus(item.status),
-          paisFormatado: formatarPais(item.pais),
-          dataFormatada: formatarData(item.data_hora)
+          riskLevelFormatado: item.risk_level,
+          paisFormatado: formatarPais(item.pais_transacao),
+          paisAnteriorFormatado: item.pais_anterior ? formatarPais(item.pais_anterior) : '-',
+          paisResidenciaFormatado: formatarPais(item.pais_residencia),
+          dataFormatada: formatarData(item.data_hora),
+          motivosFormatados: (item.risk_reasons || []).map(formatarMotivo)
         }));
 
         this.totalValor = this.fraudes.reduce((acc, curr) => acc + (curr.valor || 0), 0);
+        this.alertasCriticos = this.fraudes.filter(item => item.risk_level === 'CRITICAL').length;
+        this.usuariosImpactados = new Set(this.fraudes.map(item => item.id_usuario)).size;
 
         this.cdr.detectChanges();
 
@@ -90,8 +96,8 @@ export class DashboardComponent implements OnInit {
       data: {
         labels: this.fraudes.slice(0, 10).map(i => "ID " + (i.id_transacao)),
         datasets: [{
-          label: 'Valor da Fraude (R$)',
-          data: this.fraudes.slice(0, 10).map(i => i.valor),
+          label: 'Score de Risco',
+          data: this.fraudes.slice(0, 10).map(i => i.risk_score),
           backgroundColor: '#e74c3c',
           borderColor: '#c0392b',
           borderWidth: 1,
@@ -110,8 +116,9 @@ export class DashboardComponent implements OnInit {
         scales: {
           y: {
             beginAtZero: true,
+            max: 100,
             ticks: {
-              callback: (value) => 'R$ ' + value
+              callback: (value) => value + ' pts'
             }
           }
         }

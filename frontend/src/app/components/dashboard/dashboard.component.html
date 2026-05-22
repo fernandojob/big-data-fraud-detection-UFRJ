@@ -1,23 +1,23 @@
 <div class="dashboard-container">
   <header class="dashboard-header">
     <div class="header-content">
-      <h1>🛡️ Intelligence Anti-Fraude</h1>
-      <span class="pipeline-badge">Spark ➔ Angular 21</span>
+      <h1>Intelligence Anti-Fraude</h1>
+      <span class="pipeline-badge">Spark + Parquet + Angular 21</span>
     </div>
-    <p>Análise preditiva de registros processados em ambiente Big Data.</p>
+    <p>Alertas com score, motivos explicaveis e contexto comportamental por usuario.</p>
   </header>
 
   <section class="stats-grid">
     <div class="card alert">
-      <div class="card-icon">🚨</div>
+      <div class="card-icon">!</div>
       <div class="card-data">
-        <h3>Alertas de Fraude</h3>
-        <p class="count">{{ fraudes.length }}</p>
+        <h3>Alertas Criticos</h3>
+        <p class="count">{{ alertasCriticos }}</p>
       </div>
     </div>
-    
+
     <div class="card info">
-      <div class="card-icon">💸</div>
+      <div class="card-icon">$</div>
       <div class="card-data">
         <h3>Volume em Risco</h3>
         <p class="count">{{ totalValor | currency:'BRL' }}</p>
@@ -25,19 +25,19 @@
     </div>
 
     <div class="card secondary">
-      <div class="card-icon">⚙️</div>
+      <div class="card-icon">#</div>
       <div class="card-data">
-        <h3>Processamento</h3>
-        <p class="count">1M</p>
-        <small>Registros Analisados</small>
+        <h3>Usuarios Impactados</h3>
+        <p class="count">{{ usuariosImpactados }}</p>
+        <small>{{ fraudes.length }} alertas carregados</small>
       </div>
     </div>
   </section>
 
   <section class="chart-section">
     <div class="chart-header">
-      <h3>Top 10 Transações de Maior Risco</h3>
-      <span class="status-live">Live</span>
+      <h3>Top 10 Scores de Risco</h3>
+      <span class="status-live">Gold Parquet</span>
     </div>
     <div class="canvas-wrapper">
       <canvas #graficoCanvas></canvas>
@@ -45,58 +45,80 @@
   </section>
 
   <section class="table-section">
-  <div class="table-responsive">
-    <table>
-  <thead>
-    <tr>
-      <th>ID Transação</th>
-      <th>Valor</th>
-      <th>Status</th>
-      <th>País</th>
-      <th>Tentativas</th>
-      <th>Data / Hora</th>
-    </tr>
-  </thead>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Transacao</th>
+            <th>Usuario</th>
+            <th>Score</th>
+            <th>Nivel</th>
+            <th>Valor</th>
+            <th>Rota</th>
+            <th>Velocidade</th>
+            <th>Motivos</th>
+            <th>Data / Hora</th>
+          </tr>
+        </thead>
 
-  <tbody>
-    @for (item of dadosPaginados; track $index) {
-      <tr>
-        <td class="font-mono">{{ item.id_transacao }}</td>
+        <tbody>
+          @for (item of dadosPaginados; track item.id_transacao) {
+            <tr>
+              <td class="font-mono">{{ item.id_transacao }}</td>
+              <td class="font-mono">{{ item.id_usuario }}</td>
+              <td>
+                <strong>{{ item.risk_score }}</strong>
+              </td>
+              <td>
+                <span
+                  class="badge"
+                  [class.critical]="item.risk_level === 'CRITICAL'"
+                  [class.high]="item.risk_level === 'HIGH'"
+                  [class.medium]="item.risk_level === 'MEDIUM'"
+                >
+                  {{ item.riskLevelFormatado }}
+                </span>
+              </td>
+              <td class="font-bold">
+                {{ item.valor | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+              </td>
+              <td>
+                {{ item.paisAnteriorFormatado }} -> {{ item.paisFormatado }}
+              </td>
+              <td>
+                @if (item.velocidade_kmh_entre_transacoes) {
+                  {{ item.velocidade_kmh_entre_transacoes | number:'1.0-0':'pt-BR' }} km/h
+                } @else {
+                  -
+                }
+              </td>
+              <td>
+                <div class="reasons">
+                  @for (motivo of item.motivosFormatados; track motivo) {
+                    <span>{{ motivo }}</span>
+                  }
+                </div>
+              </td>
+              <td>{{ item.dataFormatada }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
 
-        <td class="font-bold">
-          {{ item.valor | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
-        </td>
+    <div class="pagination-controls">
+      <button (click)="mudarPagina(false)" [disabled]="paginaAtual === 1" class="btn-pag">
+        Anterior
+      </button>
 
-        <td>
-          <span class="badge">
-            ⚠️ {{ item.statusFormatado }}
-          </span>
-        </td>
+      <span class="page-info">
+        Pagina <strong>{{ paginaAtual }}</strong> de {{ totalPaginas }}
+        <small>({{ fraudes.length }} registros totais)</small>
+      </span>
 
-        <td>{{ item.paisFormatado }}</td>
-
-        <td>{{ item.tentativas }}</td>
-
-        <td>{{ item.dataFormatada }}</td>
-      </tr>
-    }
-  </tbody>
-</table>
-  </div>
-
-  <div class="pagination-controls">
-    <button (click)="mudarPagina(false)" [disabled]="paginaAtual === 1" class="btn-pag">
-      ← Anterior
-    </button>
-    
-    <span class="page-info">
-      Página <strong>{{ paginaAtual }}</strong> de {{ totalPaginas }}
-      <small>({{ fraudes.length }} registros totais)</small>
-    </span>
-
-    <button (click)="mudarPagina(true)" [disabled]="paginaAtual === totalPaginas" class="btn-pag">
-      Próxima →
-    </button>
-  </div>
-</section>
+      <button (click)="mudarPagina(true)" [disabled]="paginaAtual === totalPaginas" class="btn-pag">
+        Proxima
+      </button>
+    </div>
+  </section>
 </div>
