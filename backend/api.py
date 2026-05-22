@@ -101,6 +101,29 @@ def _apply_alert_filters(
     return filtered
 
 
+def _listar_fraudes_filtradas(
+    risk_level: Optional[str] = None,
+    id_usuario: Optional[str] = None,
+    pais: Optional[str] = None,
+    motivo: Optional[str] = None,
+    valor_minimo: Optional[float] = None,
+    data_inicio: Optional[str] = None,
+    data_fim: Optional[str] = None,
+    limit: int = 50,
+) -> list[dict]:
+    alertas = _read_parquet_prefix(GOLD_ALERTS_PREFIX)
+    alertas = _apply_alert_filters(alertas, risk_level, id_usuario, pais, motivo, valor_minimo, data_inicio, data_fim)
+    alertas = sorted(alertas, key=lambda row: (row.get("risk_score") or 0, row.get("valor") or 0), reverse=True)
+    return alertas[:limit]
+
+
+def _buscar_historico_usuario(id_usuario: str, limit: int = 20) -> list[dict]:
+    transacoes = _read_parquet_prefix(SILVER_TRANSACTIONS_PREFIX)
+    historico = [row for row in transacoes if row.get("id_usuario") == id_usuario]
+    historico = sorted(historico, key=lambda row: row.get("data_hora"), reverse=True)
+    return historico[:limit]
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "bucket": BUCKET}
@@ -117,15 +140,21 @@ def listar_fraudes(
     data_fim: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
     limit: int = Query(default=50, ge=1, le=500),
 ):
-    alertas = _read_parquet_prefix(GOLD_ALERTS_PREFIX)
-    alertas = _apply_alert_filters(alertas, risk_level, id_usuario, pais, motivo, valor_minimo, data_inicio, data_fim)
-    alertas = sorted(alertas, key=lambda row: (row.get("risk_score") or 0, row.get("valor") or 0), reverse=True)
-    return alertas[:limit]
+    return _listar_fraudes_filtradas(
+        risk_level=risk_level,
+        id_usuario=id_usuario,
+        pais=pais,
+        motivo=motivo,
+        valor_minimo=valor_minimo,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        limit=limit,
+    )
 
 
 @app.get("/fraudes/top")
 def get_fraudes(limit: int = Query(default=50, ge=1, le=500)):
-    return listar_fraudes(limit=limit)
+    return _listar_fraudes_filtradas(limit=limit)
 
 
 @app.get("/transacoes/{id_transacao}")
@@ -140,15 +169,12 @@ def buscar_transacao(id_transacao: str):
 
 @app.get("/usuarios/{id_usuario}/historico")
 def historico_usuario(id_usuario: str, limit: int = Query(default=20, ge=1, le=200)):
-    transacoes = _read_parquet_prefix(SILVER_TRANSACTIONS_PREFIX)
-    historico = [row for row in transacoes if row.get("id_usuario") == id_usuario]
-    historico = sorted(historico, key=lambda row: row.get("data_hora"), reverse=True)
-    return historico[:limit]
+    return _buscar_historico_usuario(id_usuario, limit)
 
 
 @app.get("/usuarios/{id_usuario}/perfil-risco")
 def perfil_risco_usuario(id_usuario: str):
-    historico = historico_usuario(id_usuario, limit=200)
+    historico = _buscar_historico_usuario(id_usuario, limit=200)
     if not historico:
         raise HTTPException(status_code=404, detail="Usuario sem historico encontrado")
 

@@ -288,7 +288,6 @@ def calcular_risco(transacoes):
             .when(col("risk_score") >= 35, "MEDIUM")
             .otherwise("LOW"),
         )
-        .withColumn("risk_reasons", risk_reasons)
     )
 
 
