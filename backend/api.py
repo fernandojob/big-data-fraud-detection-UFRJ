@@ -5,6 +5,12 @@ import os
 import pyarrow as pa
 import pyarrow.parquet as pq
 from typing import Optional
+from fraud_queries import (
+    aplicar_filtros_alertas,
+    limitar_resultado,
+    montar_perfil_risco,
+    ordenar_alertas_por_risco,
+)
 
 app = FastAPI(title="API Antifraude")
 
@@ -63,44 +69,6 @@ def _read_parquet_prefix(prefix: str) -> list[dict]:
     return rows
 
 
-def _apply_alert_filters(
-    rows: list[dict],
-    risk_level: Optional[str],
-    id_usuario: Optional[str],
-    pais: Optional[str],
-    motivo: Optional[str],
-    valor_minimo: Optional[float],
-    data_inicio: Optional[str],
-    data_fim: Optional[str],
-) -> list[dict]:
-    filtered = rows
-
-    if risk_level:
-        filtered = [row for row in filtered if row.get("risk_level") == risk_level]
-    if id_usuario:
-        filtered = [row for row in filtered if row.get("id_usuario") == id_usuario]
-    if pais:
-        filtered = [row for row in filtered if row.get("pais_transacao") == pais]
-    if motivo:
-        filtered = [row for row in filtered if motivo in (row.get("risk_reasons") or [])]
-    if valor_minimo is not None:
-        filtered = [row for row in filtered if (row.get("valor") or 0) >= valor_minimo]
-    if data_inicio:
-        filtered = [
-            row
-            for row in filtered
-            if str(row.get("data_processamento") or row.get("data_hora") or "")[:10] >= data_inicio
-        ]
-    if data_fim:
-        filtered = [
-            row
-            for row in filtered
-            if str(row.get("data_processamento") or row.get("data_hora") or "")[:10] <= data_fim
-        ]
-
-    return filtered
-
-
 def _listar_fraudes_filtradas(
     risk_level: Optional[str] = None,
     id_usuario: Optional[str] = None,
@@ -112,9 +80,9 @@ def _listar_fraudes_filtradas(
     limit: int = 50,
 ) -> list[dict]:
     alertas = _read_parquet_prefix(GOLD_ALERTS_PREFIX)
-    alertas = _apply_alert_filters(alertas, risk_level, id_usuario, pais, motivo, valor_minimo, data_inicio, data_fim)
-    alertas = sorted(alertas, key=lambda row: (row.get("risk_score") or 0, row.get("valor") or 0), reverse=True)
-    return alertas[:limit]
+    alertas = aplicar_filtros_alertas(alertas, risk_level, id_usuario, pais, motivo, valor_minimo, data_inicio, data_fim)
+    alertas = ordenar_alertas_por_risco(alertas)
+    return limitar_resultado(alertas, limit)
 
 
 def _buscar_historico_usuario(id_usuario: str, limit: int = 20) -> list[dict]:
@@ -178,17 +146,4 @@ def perfil_risco_usuario(id_usuario: str):
     if not historico:
         raise HTTPException(status_code=404, detail="Usuario sem historico encontrado")
 
-    alertas = [row for row in historico if row.get("risk_level") in ["MEDIUM", "HIGH", "CRITICAL"]]
-    maior_score = max((row.get("risk_score") or 0 for row in historico), default=0)
-    valor_total = sum(row.get("valor") or 0 for row in historico)
-
-    return {
-        "id_usuario": id_usuario,
-        "total_transacoes": len(historico),
-        "total_alertas": len(alertas),
-        "maior_risk_score": maior_score,
-        "valor_total": round(valor_total, 2),
-        "principais_motivos": sorted(
-            {motivo for row in alertas for motivo in (row.get("risk_reasons") or [])}
-        ),
-    }
+    return montar_perfil_risco(id_usuario, historico)
