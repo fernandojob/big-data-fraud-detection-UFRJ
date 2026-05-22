@@ -153,6 +153,8 @@ id_usuario
 pais
 motivo
 valor_minimo
+data_inicio
+data_fim
 limit
 ```
 

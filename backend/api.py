@@ -70,6 +70,8 @@ def _apply_alert_filters(
     pais: Optional[str],
     motivo: Optional[str],
     valor_minimo: Optional[float],
+    data_inicio: Optional[str],
+    data_fim: Optional[str],
 ) -> list[dict]:
     filtered = rows
 
@@ -83,6 +85,18 @@ def _apply_alert_filters(
         filtered = [row for row in filtered if motivo in (row.get("risk_reasons") or [])]
     if valor_minimo is not None:
         filtered = [row for row in filtered if (row.get("valor") or 0) >= valor_minimo]
+    if data_inicio:
+        filtered = [
+            row
+            for row in filtered
+            if str(row.get("data_processamento") or row.get("data_hora") or "")[:10] >= data_inicio
+        ]
+    if data_fim:
+        filtered = [
+            row
+            for row in filtered
+            if str(row.get("data_processamento") or row.get("data_hora") or "")[:10] <= data_fim
+        ]
 
     return filtered
 
@@ -99,10 +113,12 @@ def listar_fraudes(
     pais: Optional[str] = Query(default=None),
     motivo: Optional[str] = Query(default=None),
     valor_minimo: Optional[float] = Query(default=None, ge=0),
+    data_inicio: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    data_fim: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
     limit: int = Query(default=50, ge=1, le=500),
 ):
     alertas = _read_parquet_prefix(GOLD_ALERTS_PREFIX)
-    alertas = _apply_alert_filters(alertas, risk_level, id_usuario, pais, motivo, valor_minimo)
+    alertas = _apply_alert_filters(alertas, risk_level, id_usuario, pais, motivo, valor_minimo, data_inicio, data_fim)
     alertas = sorted(alertas, key=lambda row: (row.get("risk_score") or 0, row.get("valor") or 0), reverse=True)
     return alertas[:limit]
 
