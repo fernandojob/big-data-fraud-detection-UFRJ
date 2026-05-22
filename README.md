@@ -202,6 +202,14 @@ MINIO_ACCESS_KEY=admin
 MINIO_SECRET_KEY=admin123
 ```
 
+## Testes
+
+Os testes unitários cobrem a lógica pura de filtros, ordenação e perfil de risco da API, sem depender de MinIO:
+
+```bash
+python -m unittest discover -s backend/tests -p "test_*.py"
+```
+
 ## Evidências Visuais
 
 ![Dashboard com gráfico](./frontend/public/grafico-frontend.png)
