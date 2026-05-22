@@ -2,7 +2,9 @@ from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import (
     avg,
     col,
+    collect_set,
     concat,
+    count,
     current_date,
     expr,
     hour,
@@ -11,6 +13,7 @@ from pyspark.sql.functions import (
     lit,
     rand,
     round as spark_round,
+    size,
     stddev,
     to_date,
     when,
@@ -169,9 +172,12 @@ def gerar_transacoes(usuarios):
 def calcular_features_comportamentais(transacoes):
     janela_usuario = Window.partitionBy("id_usuario").orderBy("data_hora")
     janela_historica = janela_usuario.rowsBetween(Window.unboundedPreceding, -1)
+    janela_1h = Window.partitionBy("id_usuario").orderBy("data_hora_ts").rangeBetween(-3600, 0)
+    janela_24h = Window.partitionBy("id_usuario").orderBy("data_hora_ts").rangeBetween(-86400, 0)
 
     enriquecidas = (
-        transacoes.withColumn("pais_anterior", lag("pais_transacao").over(janela_usuario))
+        transacoes.withColumn("data_hora_ts", col("data_hora").cast("long"))
+        .withColumn("pais_anterior", lag("pais_transacao").over(janela_usuario))
         .withColumn("cidade_anterior", lag("cidade_transacao").over(janela_usuario))
         .withColumn("latitude_anterior", lag("latitude").over(janela_usuario))
         .withColumn("longitude_anterior", lag("longitude").over(janela_usuario))
@@ -179,6 +185,8 @@ def calcular_features_comportamentais(transacoes):
         .withColumn("device_anterior", lag("device").over(janela_usuario))
         .withColumn("media_valor_usuario", avg("valor").over(janela_historica))
         .withColumn("desvio_valor_usuario", stddev("valor").over(janela_historica))
+        .withColumn("qtd_transacoes_1h", count("id_transacao").over(janela_1h))
+        .withColumn("qtd_paises_24h", size(collect_set("pais_transacao").over(janela_24h)))
         .withColumn(
             "minutos_desde_ultima_transacao",
             spark_round((col("data_hora").cast("long") - col("data_hora_anterior").cast("long")) / 60, 2),
@@ -214,7 +222,8 @@ def calcular_features_comportamentais(transacoes):
         .withColumn("valor_acima_do_perfil", col("valor") > (col("ticket_medio") * 4))
         .withColumn("device_novo", col("device") != col("device_principal"))
         .withColumn("pais_novo_para_usuario", (col("pais_transacao") != col("pais_residencia")) & (col("pais_anterior").isNotNull()))
-        .withColumn("frequencia_anormal", col("minutos_desde_ultima_transacao").between(0, 5))
+        .withColumn("frequencia_anormal", (col("minutos_desde_ultima_transacao").between(0, 5)) | (col("qtd_transacoes_1h") >= 5))
+        .drop("data_hora_ts")
     )
 
 
