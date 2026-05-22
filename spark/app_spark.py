@@ -303,6 +303,24 @@ def salvar_resultados(usuarios, transacoes_brutas, transacoes_enriquecidas):
         f"{S3_BASE_PATH}/gold/alertas_fraude"
     )
 
+    return alertas
+
+
+def imprimir_metricas(usuarios, transacoes_brutas, transacoes_enriquecidas, alertas):
+    total_usuarios = usuarios.count()
+    total_transacoes = transacoes_brutas.count()
+    total_alertas = alertas.count()
+
+    print("Metricas do pipeline:")
+    print(f"- usuarios: {total_usuarios}")
+    print(f"- transacoes_brutas: {total_transacoes}")
+    print(f"- transacoes_enriquecidas: {transacoes_enriquecidas.count()}")
+    print(f"- alertas: {total_alertas}")
+    print("- alertas_por_risco:")
+
+    for row in alertas.groupBy("risk_level").count().orderBy("risk_level").collect():
+        print(f"  - {row['risk_level']}: {row['count']}")
+
 
 print("Carregando usuarios sinteticos...")
 usuarios_df = carregar_usuarios()
@@ -317,6 +335,8 @@ print("Calculando score de risco...")
 transacoes_com_risco_df = calcular_risco(transacoes_enriquecidas_df)
 
 print("Salvando camadas bronze, silver e gold em Parquet...")
-salvar_resultados(usuarios_df, transacoes_df, transacoes_com_risco_df)
+alertas_df = salvar_resultados(usuarios_df, transacoes_df, transacoes_com_risco_df)
+
+imprimir_metricas(usuarios_df, transacoes_df, transacoes_com_risco_df, alertas_df)
 
 print("Pipeline finalizado com sucesso!")
