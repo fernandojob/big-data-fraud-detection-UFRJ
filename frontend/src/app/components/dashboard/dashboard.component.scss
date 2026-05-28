@@ -161,6 +161,33 @@ $radius: 16px;
       white-space: nowrap;
     }
   }
+
+  .decision {
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 4px 8px;
+
+    &.block {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #b91c1c;
+    }
+
+    &.review {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #92400e;
+    }
+
+    &.approve {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+      color: #166534;
+    }
+  }
 }
 
 @keyframes blink {

@@ -10,6 +10,7 @@ def aplicar_filtros_alertas(
     valor_minimo: Optional[float] = None,
     data_inicio: Optional[str] = None,
     data_fim: Optional[str] = None,
+    decision: Optional[str] = None,
 ) -> list[dict]:
     filtered = rows
 
@@ -35,6 +36,8 @@ def aplicar_filtros_alertas(
             for row in filtered
             if str(row.get("data_processamento") or row.get("data_hora") or "")[:10] <= data_fim
         ]
+    if decision:
+        filtered = [row for row in filtered if row.get("decision") == decision]
 
     return filtered
 

@@ -21,6 +21,7 @@ class FraudQueriesTest(unittest.TestCase):
                 "risk_level": "CRITICAL",
                 "risk_score": 95,
                 "valor": 5000,
+                "decision": "BLOCK",
                 "pais_transacao": "JP",
                 "data_processamento": "2026-05-22",
                 "risk_reasons": ["IMPOSSIBLE_TRAVEL", "NEW_COUNTRY_FOR_USER"],
@@ -31,6 +32,7 @@ class FraudQueriesTest(unittest.TestCase):
                 "risk_level": "HIGH",
                 "risk_score": 70,
                 "valor": 8000,
+                "decision": "REVIEW",
                 "pais_transacao": "BR",
                 "data_processamento": "2026-05-21",
                 "risk_reasons": ["VALUE_ABOVE_USER_PROFILE"],
@@ -41,6 +43,7 @@ class FraudQueriesTest(unittest.TestCase):
                 "risk_level": "MEDIUM",
                 "risk_score": 45,
                 "valor": 900,
+                "decision": "REVIEW",
                 "pais_transacao": "US",
                 "data_processamento": "2026-05-20",
                 "risk_reasons": ["NEW_DEVICE"],
@@ -70,6 +73,11 @@ class FraudQueriesTest(unittest.TestCase):
 
     def test_limita_resultado(self):
         self.assertEqual(2, len(limitar_resultado(self.alertas, 2)))
+
+    def test_filtra_alertas_por_decisao(self):
+        filtrados = aplicar_filtros_alertas(self.alertas, decision="BLOCK")
+
+        self.assertEqual(["tx_1"], [row["id_transacao"] for row in filtrados])
 
     def test_monta_perfil_risco(self):
         perfil = montar_perfil_risco("user_1", self.alertas)

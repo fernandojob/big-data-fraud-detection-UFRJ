@@ -5,6 +5,7 @@ export interface Fraude {
   risk_score: number;
   risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   risk_reasons: string[];
+  decision: 'APPROVE' | 'REVIEW' | 'BLOCK';
   pais_residencia: string;
   pais_transacao: string;
   pais_anterior?: string;

@@ -16,6 +16,7 @@ from pyspark.sql.functions import (
     size,
     stddev,
     to_date,
+    to_timestamp,
     when,
 )
 from pyspark.sql.types import (
@@ -33,6 +34,7 @@ os.environ["YARN_CONF_DIR"] = ""
 BUCKET = os.getenv("FRAUD_BUCKET", "fraudes")
 S3_BASE_PATH = f"s3a://{BUCKET}"
 USER_SEED_PATH = os.getenv("USER_SEED_PATH", "/app/seeds/usuarios.csv")
+FRAUD_SCENARIOS_PATH = os.getenv("FRAUD_SCENARIOS_PATH", "/app/seeds/cenarios_fraude.csv")
 TRANSACTION_COUNT = int(os.getenv("TRANSACTION_COUNT", "1000000"))
 
 spark = (
@@ -145,6 +147,66 @@ def gerar_transacoes(usuarios):
                 """
             ),
         )
+        .withColumn("data_processamento", current_date())
+        .withColumn("hora", hour(col("data_hora")))
+        .select(
+            "id_transacao",
+            "id_usuario",
+            "perfil",
+            "pais_residencia",
+            "cidade_residencia",
+            "pais_transacao",
+            "cidade_transacao",
+            "latitude",
+            "longitude",
+            "valor",
+            "ticket_medio",
+            "device",
+            "device_principal",
+            "tentativas",
+            "data_hora",
+            "data_processamento",
+            "hora",
+        )
+    )
+
+
+def carregar_cenarios_fraude(usuarios):
+    if not os.path.exists(FRAUD_SCENARIOS_PATH):
+        return None
+
+    schema = StructType(
+        [
+            StructField("id_transacao", StringType(), False),
+            StructField("id_usuario", StringType(), False),
+            StructField("pais_transacao", StringType(), False),
+            StructField("cidade_transacao", StringType(), False),
+            StructField("latitude", DoubleType(), False),
+            StructField("longitude", DoubleType(), False),
+            StructField("valor", DoubleType(), False),
+            StructField("device", StringType(), False),
+            StructField("tentativas", IntegerType(), False),
+            StructField("data_hora", StringType(), False),
+        ]
+    )
+
+    return (
+        spark.read.option("header", True)
+        .schema(schema)
+        .csv(FRAUD_SCENARIOS_PATH)
+        .join(
+            usuarios.select(
+                "id_usuario",
+                "perfil",
+                "pais_residencia",
+                "cidade_residencia",
+                "ticket_medio",
+                "device_principal",
+            ),
+            "id_usuario",
+            "inner",
+        )
+        .withColumn("data_hora", to_timestamp(col("data_hora")))
         .withColumn("data_processamento", current_date())
         .withColumn("hora", hour(col("data_hora")))
         .select(
@@ -288,6 +350,12 @@ def calcular_risco(transacoes):
             .when(col("risk_score") >= 35, "MEDIUM")
             .otherwise("LOW"),
         )
+        .withColumn(
+            "decision",
+            when(col("risk_level") == "CRITICAL", "BLOCK")
+            .when(col("risk_level").isin("MEDIUM", "HIGH"), "REVIEW")
+            .otherwise("APPROVE"),
+        )
     )
 
 
@@ -327,6 +395,11 @@ usuarios_df = carregar_usuarios()
 
 print("Gerando transacoes...")
 transacoes_df = gerar_transacoes(usuarios_df)
+
+print("Carregando cenarios deterministicos de fraude...")
+cenarios_fraude_df = carregar_cenarios_fraude(usuarios_df)
+if cenarios_fraude_df is not None:
+    transacoes_df = transacoes_df.unionByName(cenarios_fraude_df)
 
 print("Calculando features comportamentais...")
 transacoes_enriquecidas_df = calcular_features_comportamentais(transacoes_df)

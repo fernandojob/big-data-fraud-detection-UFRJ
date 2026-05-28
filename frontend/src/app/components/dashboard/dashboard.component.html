@@ -53,6 +53,7 @@
             <th>Usuario</th>
             <th>Score</th>
             <th>Nivel</th>
+            <th>Decisao</th>
             <th>Valor</th>
             <th>Rota</th>
             <th>Velocidade</th>
@@ -77,6 +78,16 @@
                   [class.medium]="item.risk_level === 'MEDIUM'"
                 >
                   {{ item.riskLevelFormatado }}
+                </span>
+              </td>
+              <td>
+                <span
+                  class="decision"
+                  [class.block]="item.decision === 'BLOCK'"
+                  [class.review]="item.decision === 'REVIEW'"
+                  [class.approve]="item.decision === 'APPROVE'"
+                >
+                  {{ item.decision }}
                 </span>
               </td>
               <td class="font-bold">

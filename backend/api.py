@@ -77,10 +77,21 @@ def _listar_fraudes_filtradas(
     valor_minimo: Optional[float] = None,
     data_inicio: Optional[str] = None,
     data_fim: Optional[str] = None,
+    decision: Optional[str] = None,
     limit: int = 50,
 ) -> list[dict]:
     alertas = _read_parquet_prefix(GOLD_ALERTS_PREFIX)
-    alertas = aplicar_filtros_alertas(alertas, risk_level, id_usuario, pais, motivo, valor_minimo, data_inicio, data_fim)
+    alertas = aplicar_filtros_alertas(
+        alertas,
+        risk_level,
+        id_usuario,
+        pais,
+        motivo,
+        valor_minimo,
+        data_inicio,
+        data_fim,
+        decision,
+    )
     alertas = ordenar_alertas_por_risco(alertas)
     return limitar_resultado(alertas, limit)
 
@@ -106,6 +117,7 @@ def listar_fraudes(
     valor_minimo: Optional[float] = Query(default=None, ge=0),
     data_inicio: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
     data_fim: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    decision: Optional[str] = Query(default=None, pattern=r"^(APPROVE|REVIEW|BLOCK)$"),
     limit: int = Query(default=50, ge=1, le=500),
 ):
     return _listar_fraudes_filtradas(
@@ -116,6 +128,7 @@ def listar_fraudes(
         valor_minimo=valor_minimo,
         data_inicio=data_inicio,
         data_fim=data_fim,
+        decision=decision,
         limit=limit,
     )
 
