@@ -359,7 +359,61 @@ def calcular_risco(transacoes):
     )
 
 
-def salvar_resultados(usuarios, transacoes_brutas, transacoes_enriquecidas):
+def executar_data_quality_checks(usuarios, transacoes_brutas, transacoes_enriquecidas):
+    checks = [
+        ("usuarios_com_id_nulo", usuarios.filter(col("id_usuario").isNull()).count()),
+        ("usuarios_com_pais_residencia_nulo", usuarios.filter(col("pais_residencia").isNull()).count()),
+        (
+            "transacoes_com_usuario_nulo",
+            transacoes_brutas.filter(col("id_usuario").isNull()).count(),
+        ),
+        (
+            "transacoes_com_valor_invalido",
+            transacoes_brutas.filter((col("valor").isNull()) | (col("valor") < 0)).count(),
+        ),
+        ("transacoes_sem_data_hora", transacoes_brutas.filter(col("data_hora").isNull()).count()),
+        (
+            "transacoes_sem_pais",
+            transacoes_brutas.filter(col("pais_transacao").isNull()).count(),
+        ),
+        (
+            "risk_score_fora_intervalo",
+            transacoes_enriquecidas.filter(
+                (col("risk_score").isNull()) | (col("risk_score") < 0) | (col("risk_score") > 100)
+            ).count(),
+        ),
+        (
+            "risk_level_invalido",
+            transacoes_enriquecidas.filter(~col("risk_level").isin("LOW", "MEDIUM", "HIGH", "CRITICAL")).count(),
+        ),
+        (
+            "decision_invalida",
+            transacoes_enriquecidas.filter(~col("decision").isin("APPROVE", "REVIEW", "BLOCK")).count(),
+        ),
+    ]
+
+    report_rows = [
+        (check_name, int(invalid_count), "PASS" if invalid_count == 0 else "FAIL")
+        for check_name, invalid_count in checks
+    ]
+
+    report = spark.createDataFrame(report_rows, ["check_name", "invalid_count", "status"]).withColumn(
+        "data_processamento",
+        current_date(),
+    )
+
+    print("Data quality checks:")
+    for check_name, invalid_count, status in report_rows:
+        print(f"- {check_name}: {status} ({invalid_count})")
+
+    failed = [check_name for check_name, invalid_count, _ in report_rows if invalid_count > 0]
+    if failed:
+        raise ValueError(f"Data quality checks falharam: {', '.join(failed)}")
+
+    return report
+
+
+def salvar_resultados(usuarios, transacoes_brutas, transacoes_enriquecidas, data_quality_report):
     alertas = transacoes_enriquecidas.filter(col("risk_level").isin("MEDIUM", "HIGH", "CRITICAL"))
 
     usuarios.write.mode("overwrite").parquet(f"{S3_BASE_PATH}/bronze/usuarios")
@@ -369,6 +423,9 @@ def salvar_resultados(usuarios, transacoes_brutas, transacoes_enriquecidas):
     )
     alertas.write.mode("overwrite").partitionBy("data_processamento", "risk_level").parquet(
         f"{S3_BASE_PATH}/gold/alertas_fraude"
+    )
+    data_quality_report.write.mode("overwrite").partitionBy("data_processamento").parquet(
+        f"{S3_BASE_PATH}/gold/data_quality"
     )
 
     return alertas
@@ -407,8 +464,11 @@ transacoes_enriquecidas_df = calcular_features_comportamentais(transacoes_df)
 print("Calculando score de risco...")
 transacoes_com_risco_df = calcular_risco(transacoes_enriquecidas_df)
 
+print("Executando data quality checks...")
+data_quality_report_df = executar_data_quality_checks(usuarios_df, transacoes_df, transacoes_com_risco_df)
+
 print("Salvando camadas bronze, silver e gold em Parquet...")
-alertas_df = salvar_resultados(usuarios_df, transacoes_df, transacoes_com_risco_df)
+alertas_df = salvar_resultados(usuarios_df, transacoes_df, transacoes_com_risco_df, data_quality_report_df)
 
 imprimir_metricas(usuarios_df, transacoes_df, transacoes_com_risco_df, alertas_df)
 
