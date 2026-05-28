@@ -1,15 +1,13 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from minio import Minio
+import duckdb
 import os
-import pyarrow as pa
-import pyarrow.parquet as pq
+from pathlib import Path
+import shutil
 from typing import Optional
 from fraud_queries import (
-    aplicar_filtros_alertas,
-    limitar_resultado,
     montar_perfil_risco,
-    ordenar_alertas_por_risco,
 )
 
 app = FastAPI(title="API Antifraude")
@@ -35,38 +33,61 @@ if not client.bucket_exists(BUCKET):
 
 GOLD_ALERTS_PREFIX = os.getenv("GOLD_ALERTS_PREFIX", "gold/alertas_fraude/")
 SILVER_TRANSACTIONS_PREFIX = os.getenv("SILVER_TRANSACTIONS_PREFIX", "silver/transacoes_enriquecidas/")
+PARQUET_CACHE_DIR = Path(os.getenv("PARQUET_CACHE_DIR", "/tmp/fraud-serving-cache"))
 
 
-def _partition_values(object_name: str) -> dict:
-    values = {}
-    for part in object_name.split("/"):
-        if "=" in part:
-            key, value = part.split("=", 1)
-            values[key] = value
-    return values
-
-
-def _read_parquet_prefix(prefix: str) -> list[dict]:
+def _sync_parquet_prefix(prefix: str) -> Optional[str]:
     objects = client.list_objects(BUCKET, prefix=prefix, recursive=True)
-    rows: list[dict] = []
+    prefix_dir = PARQUET_CACHE_DIR / prefix.strip("/")
 
+    if prefix_dir.exists():
+        shutil.rmtree(prefix_dir)
+    prefix_dir.mkdir(parents=True, exist_ok=True)
+
+    found = False
     for obj in objects:
         if not obj.object_name.endswith(".parquet"):
             continue
 
-        response = client.get_object(BUCKET, obj.object_name)
-        try:
-            data = response.read()
-            table = pq.read_table(pa.BufferReader(data))
-            partition_values = _partition_values(obj.object_name)
-            for row in table.to_pylist():
-                row.update({key: row.get(key, value) for key, value in partition_values.items()})
-                rows.append(row)
-        finally:
-            response.close()
-            response.release_conn()
+        local_path = PARQUET_CACHE_DIR / obj.object_name
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        client.fget_object(BUCKET, obj.object_name, str(local_path))
+        found = True
 
-    return rows
+    if not found:
+        return None
+
+    return (prefix_dir / "**" / "*.parquet").as_posix().replace("'", "''")
+
+
+def _duckdb_rows(sql: str, params: list | None = None) -> list[dict]:
+    with duckdb.connect(database=":memory:") as conn:
+        result = conn.execute(sql, params or [])
+        columns = [column[0] for column in result.description]
+        return [dict(zip(columns, row)) for row in result.fetchall()]
+
+
+def _query_parquet_prefix(
+    prefix: str,
+    where_clauses: list[str] | None = None,
+    params: list | None = None,
+    order_by: str | None = None,
+    limit: int | None = None,
+) -> list[dict]:
+    parquet_glob = _sync_parquet_prefix(prefix)
+    if parquet_glob is None:
+        return []
+
+    sql = f"SELECT * FROM read_parquet('{parquet_glob}', hive_partitioning=true)"
+    if where_clauses:
+        sql += " WHERE " + " AND ".join(where_clauses)
+    if order_by:
+        sql += f" ORDER BY {order_by}"
+    if limit is not None:
+        sql += " LIMIT ?"
+        params = [*(params or []), limit]
+
+    return _duckdb_rows(sql, params)
 
 
 def _listar_fraudes_filtradas(
@@ -80,32 +101,56 @@ def _listar_fraudes_filtradas(
     decision: Optional[str] = None,
     limit: int = 50,
 ) -> list[dict]:
-    alertas = _read_parquet_prefix(GOLD_ALERTS_PREFIX)
-    alertas = aplicar_filtros_alertas(
-        alertas,
-        risk_level,
-        id_usuario,
-        pais,
-        motivo,
-        valor_minimo,
-        data_inicio,
-        data_fim,
-        decision,
+    where_clauses = []
+    params = []
+
+    if risk_level:
+        where_clauses.append("risk_level = ?")
+        params.append(risk_level)
+    if id_usuario:
+        where_clauses.append("id_usuario = ?")
+        params.append(id_usuario)
+    if pais:
+        where_clauses.append("pais_transacao = ?")
+        params.append(pais)
+    if motivo:
+        where_clauses.append("list_contains(risk_reasons, ?)")
+        params.append(motivo)
+    if valor_minimo is not None:
+        where_clauses.append("valor >= ?")
+        params.append(valor_minimo)
+    if data_inicio:
+        where_clauses.append("CAST(COALESCE(CAST(data_processamento AS VARCHAR), SUBSTR(CAST(data_hora AS VARCHAR), 1, 10)) AS VARCHAR) >= ?")
+        params.append(data_inicio)
+    if data_fim:
+        where_clauses.append("CAST(COALESCE(CAST(data_processamento AS VARCHAR), SUBSTR(CAST(data_hora AS VARCHAR), 1, 10)) AS VARCHAR) <= ?")
+        params.append(data_fim)
+    if decision:
+        where_clauses.append("decision = ?")
+        params.append(decision)
+
+    return _query_parquet_prefix(
+        GOLD_ALERTS_PREFIX,
+        where_clauses=where_clauses,
+        params=params,
+        order_by="risk_score DESC, valor DESC",
+        limit=limit,
     )
-    alertas = ordenar_alertas_por_risco(alertas)
-    return limitar_resultado(alertas, limit)
 
 
 def _buscar_historico_usuario(id_usuario: str, limit: int = 20) -> list[dict]:
-    transacoes = _read_parquet_prefix(SILVER_TRANSACTIONS_PREFIX)
-    historico = [row for row in transacoes if row.get("id_usuario") == id_usuario]
-    historico = sorted(historico, key=lambda row: row.get("data_hora"), reverse=True)
-    return historico[:limit]
+    return _query_parquet_prefix(
+        SILVER_TRANSACTIONS_PREFIX,
+        where_clauses=["id_usuario = ?"],
+        params=[id_usuario],
+        order_by="data_hora DESC",
+        limit=limit,
+    )
 
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "bucket": BUCKET}
+    return {"status": "ok", "bucket": BUCKET, "serving": "duckdb"}
 
 
 @app.get("/fraudes")
@@ -140,10 +185,14 @@ def get_fraudes(limit: int = Query(default=50, ge=1, le=500)):
 
 @app.get("/transacoes/{id_transacao}")
 def buscar_transacao(id_transacao: str):
-    transacoes = _read_parquet_prefix(SILVER_TRANSACTIONS_PREFIX)
-    for transacao in transacoes:
-        if transacao.get("id_transacao") == id_transacao:
-            return transacao
+    transacoes = _query_parquet_prefix(
+        SILVER_TRANSACTIONS_PREFIX,
+        where_clauses=["id_transacao = ?"],
+        params=[id_transacao],
+        limit=1,
+    )
+    if transacoes:
+        return transacoes[0]
 
     raise HTTPException(status_code=404, detail="Transacao nao encontrada")
 
