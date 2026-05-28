@@ -13,7 +13,7 @@ Apache Spark (ETL)
 MinIO Object Storage (S3A)
         |
         v
-FastAPI
+DuckDB Serving + FastAPI
         |
         v
 Angular + Chart.js
@@ -23,7 +23,8 @@ Angular + Chart.js
 
 - `spark/`: aplicação PySpark responsável por ler uma seed sintética de usuários, gerar 1.000.000 de transações simuladas, calcular features comportamentais, aplicar score de risco e gravar os resultados no MinIO via protocolo `s3a://`.
 - `spark/seeds/usuarios.csv`: base cadastral sintética com 10.000 usuários, usada apenas para fins educacionais. Em um ambiente real, essa origem viria de CRM, core banking, e-commerce, sistema de contas ou data warehouse.
-- `backend/`: API FastAPI que lê arquivos Parquet da camada Gold no bucket `fraudes` do MinIO e expõe alertas, filtros, detalhe de transação e histórico por usuário.
+- `spark/seeds/cenarios_fraude.csv`: massa determinística pequena com cenários conhecidos, como compra normal, impossible travel, valor fora do perfil, dispositivo novo, muitas tentativas e horário incomum.
+- `backend/`: API FastAPI que usa DuckDB como camada serving para consultar arquivos Parquet da camada Gold no bucket `fraudes` do MinIO e expõe alertas, filtros, data quality, detalhe de transação e histórico por usuário.
 - `frontend/`: dashboard Angular que consome a API, exibe indicadores, gráfico por score de risco e tabela paginada.
 - `docker-compose.yml`: orquestra MinIO, API e job Spark em containers.
 
@@ -32,10 +33,12 @@ Angular + Chart.js
 1. O Spark lê uma seed sintética de usuários em CSV.
 2. O Spark gera transações sintéticas associadas a esses usuários.
 3. O pipeline calcula features comportamentais por usuário, como país anterior, dispositivo novo, tempo desde a última transação, distância percorrida e velocidade estimada.
-4. As transações recebem `risk_score`, `risk_level` e `risk_reasons`.
-5. Os dados são gravados no MinIO em Parquet nas camadas Bronze, Silver e Gold.
-6. A API lê a camada Gold e expõe os alertas para o frontend.
-7. O frontend renderiza indicadores, gráfico por score e tabela com motivos explicáveis.
+4. As transações recebem `risk_score`, `risk_level`, `risk_reasons` e `decision`.
+5. O pipeline executa data quality checks e falha caso encontre campos obrigatórios inválidos.
+6. Os dados são gravados no MinIO em Parquet nas camadas Bronze, Silver e Gold.
+7. A API sincroniza os Parquets para um cache local e consulta a camada Gold com DuckDB.
+8. A API expõe os alertas para o frontend.
+9. O frontend renderiza indicadores, gráfico por score e tabela com motivos explicáveis.
 
 ## Regras de Fraude
 
@@ -44,6 +47,7 @@ O projeto agora usa score explicável em vez de uma classificação fixa por tra
 - `risk_score`: pontuação de 0 a 100.
 - `risk_level`: `LOW`, `MEDIUM`, `HIGH` ou `CRITICAL`.
 - `risk_reasons`: lista de motivos que explicam o alerta.
+- `decision`: decisão operacional simulada, com `APPROVE`, `REVIEW` ou `BLOCK`.
 
 Motivos atualmente simulados:
 
@@ -64,6 +68,7 @@ s3a://fraudes/bronze/usuarios/
 s3a://fraudes/bronze/transacoes/
 s3a://fraudes/silver/transacoes_enriquecidas/
 s3a://fraudes/gold/alertas_fraude/
+s3a://fraudes/gold/data_quality/
 ```
 
 A camada Gold é particionada por `data_processamento` e `risk_level`.
@@ -75,6 +80,7 @@ A camada Gold é particionada por `data_processamento` e `risk_level`.
 - MinIO
 - FastAPI
 - Uvicorn
+- DuckDB
 - Angular 21
 - Chart.js
 - Docker e Docker Compose
@@ -156,6 +162,7 @@ motivo
 valor_minimo
 data_inicio
 data_fim
+decision
 limit
 ```
 
