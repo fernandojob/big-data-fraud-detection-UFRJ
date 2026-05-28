@@ -384,11 +384,15 @@ def executar_data_quality_checks(usuarios, transacoes_brutas, transacoes_enrique
         ),
         (
             "risk_level_invalido",
-            transacoes_enriquecidas.filter(~col("risk_level").isin("LOW", "MEDIUM", "HIGH", "CRITICAL")).count(),
+            transacoes_enriquecidas.filter(
+                (col("risk_level").isNull()) | (~col("risk_level").isin("LOW", "MEDIUM", "HIGH", "CRITICAL"))
+            ).count(),
         ),
         (
             "decision_invalida",
-            transacoes_enriquecidas.filter(~col("decision").isin("APPROVE", "REVIEW", "BLOCK")).count(),
+            transacoes_enriquecidas.filter(
+                (col("decision").isNull()) | (~col("decision").isin("APPROVE", "REVIEW", "BLOCK"))
+            ).count(),
         ),
     ]
 
