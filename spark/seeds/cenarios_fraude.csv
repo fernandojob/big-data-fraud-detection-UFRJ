@@ -1,0 +1,7 @@
+id_transacao,id_usuario,pais_transacao,cidade_transacao,latitude,longitude,valor,device,tentativas,data_hora
+scenario_normal_br,user_00001,BR,Sao Paulo,-23.5505,-46.6333,85.90,mobile,1,2026-05-20 10:00:00
+scenario_impossible_travel,user_00001,JP,Tokyo,35.6762,139.6503,4200.00,web,4,2026-05-20 11:00:00
+scenario_valor_alto,user_00002,BR,Sao Paulo,-23.5505,-46.6333,3500.00,mobile,1,2026-05-20 12:00:00
+scenario_device_novo,user_00003,BR,Sao Paulo,-23.5505,-46.6333,110.00,mobile,1,2026-05-20 13:00:00
+scenario_muitas_tentativas,user_00004,BR,Sao Paulo,-23.5505,-46.6333,180.00,mobile,5,2026-05-20 14:00:00
+scenario_horario_incomum,user_00005,BR,Sao Paulo,-23.5505,-46.6333,240.00,mobile,1,2026-05-20 03:10:00
