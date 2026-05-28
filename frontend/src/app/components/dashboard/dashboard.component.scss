@@ -108,7 +108,7 @@ $radius: 16px;
         tbody tr {
           border-top: 1px solid #f1f5f9;
           &:hover { background: #fdfdfd; }
-          td { padding: 1rem; color: $dark-bg; }
+          td { padding: 1rem; color: $dark-bg; vertical-align: top; }
           .font-mono { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
           .font-bold { font-weight: 700; }
         }
@@ -117,13 +117,49 @@ $radius: 16px;
   }
 
   .badge {
-    background: #fff5f5;
-    color: $red-danger;
+    background: #ecfdf5;
+    color: #047857;
     padding: 6px 12px;
     border-radius: 8px;
     font-size: 0.75rem;
     font-weight: 700;
-    border: 1px solid #fed7d7;
+    border: 1px solid #bbf7d0;
+
+    &.critical {
+      background: #fff5f5;
+      color: $red-danger;
+      border-color: #fed7d7;
+    }
+
+    &.high {
+      background: #fff7ed;
+      color: #ea580c;
+      border-color: #fed7aa;
+    }
+
+    &.medium {
+      background: #fffbeb;
+      color: #b45309;
+      border-color: #fde68a;
+    }
+  }
+
+  .reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 280px;
+
+    span {
+      background: #eef2ff;
+      color: #3730a3;
+      border: 1px solid #c7d2fe;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      white-space: nowrap;
+    }
   }
 }
 

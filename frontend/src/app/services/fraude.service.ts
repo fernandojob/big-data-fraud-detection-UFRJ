@@ -12,9 +12,10 @@ export class FraudeService {
 
   constructor(private http: HttpClient) {}
 
-  getTopFraudes(): Observable<Fraude[]> {
-    return this.http.get<Fraude[]>(`${this.API}/fraudes/top`);
+  getTopFraudes(limit = 50): Observable<Fraude[]> {
+    return this.http.get<Fraude[]>(`${this.API}/fraudes/top?limit=${limit}`);
   }
+
   getFraudes(): Observable<Fraude[]> {
     return this.http.get<Fraude[]>(`${this.API}/fraudes`);
   }

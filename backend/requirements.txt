@@ -1,5 +1,5 @@
 fastapi
 uvicorn
 minio
-pyspark
 boto3
+pyarrow
