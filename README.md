@@ -210,6 +210,14 @@ Os testes unitários cobrem a lógica pura de filtros, ordenação e perfil de r
 python -m unittest discover -s backend/tests -p "test_*.py"
 ```
 
+### Validação End-To-End Com Docker
+
+O script abaixo sobe MinIO, executa o Spark com uma carga reduzida, sobe a API e valida se `/health` e `/fraudes/top` respondem com os campos esperados:
+
+```bash
+python scripts/validate_e2e.py 2000
+```
+
 ## Evidências Visuais
 
 ![Dashboard com gráfico](./frontend/public/grafico-frontend.png)
