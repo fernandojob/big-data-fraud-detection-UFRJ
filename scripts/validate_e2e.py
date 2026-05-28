@@ -28,11 +28,27 @@ def wait_json(url: str, timeout_seconds: int = 90):
     raise RuntimeError(f"Timeout aguardando {url}: {last_error}")
 
 
+def wait_http(url: str, timeout_seconds: int = 90):
+    deadline = time.time() + timeout_seconds
+    last_error = None
+
+    while time.time() < deadline:
+        try:
+            with urlopen(url, timeout=5) as response:
+                if response.status < 500:
+                    return
+        except Exception as exc:
+            last_error = exc
+            time.sleep(2)
+
+    raise RuntimeError(f"Timeout aguardando {url}: {last_error}")
+
+
 def main():
     transaction_count = sys.argv[1] if len(sys.argv) > 1 else "2000"
 
     run([*ROOT_COMMAND, "up", "-d", "--build", "minio"])
-    time.sleep(5)
+    wait_http("http://localhost:9000/minio/health/live")
 
     run([*ROOT_COMMAND, "run", "--rm", "-e", f"TRANSACTION_COUNT={transaction_count}", "spark"])
 
