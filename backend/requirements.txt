@@ -3,4 +3,3 @@ uvicorn
 minio
 boto3
 duckdb
-pyarrow
