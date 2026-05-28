@@ -2,7 +2,7 @@
 
 Projeto acadêmico desenvolvido no contexto da pós-graduação em Engenharia de Software da Universidade Federal do Rio de Janeiro (UFRJ). A aplicação simula um pipeline de Big Data para geração, processamento, armazenamento e visualização de transações financeiras suspeitas.
 
-O sistema combina Apache Spark, MinIO compatível com S3, FastAPI e Angular para demonstrar uma arquitetura desacoplada entre processamento, armazenamento, exposição de dados e interface analítica.
+O sistema combina Apache Spark, MinIO compatível com S3, DuckDB, FastAPI e Angular para demonstrar uma arquitetura desacoplada entre processamento, armazenamento, serving analítico, exposição de dados e interface analítica.
 
 ## Arquitetura
 
@@ -25,7 +25,8 @@ Angular + Chart.js
 - `spark/seeds/usuarios.csv`: base cadastral sintética com 10.000 usuários, usada apenas para fins educacionais. Em um ambiente real, essa origem viria de CRM, core banking, e-commerce, sistema de contas ou data warehouse.
 - `spark/seeds/cenarios_fraude.csv`: massa determinística pequena com cenários conhecidos, como compra normal, impossible travel, valor fora do perfil, dispositivo novo, muitas tentativas e horário incomum.
 - `backend/`: API FastAPI que usa DuckDB como camada serving para consultar arquivos Parquet da camada Gold no bucket `fraudes` do MinIO e expõe alertas, filtros, data quality, detalhe de transação e histórico por usuário.
-- `frontend/`: dashboard Angular que consome a API, exibe indicadores, gráfico por score de risco e tabela paginada.
+- `frontend/`: dashboard Angular que consome a API, exibe indicadores, gráfico por score de risco e tabela paginada com motivos explicáveis e decisão operacional.
+- `scripts/validate_e2e.py`: script de validação end-to-end que sobe MinIO, executa o Spark com uma carga reduzida, inicia a API e valida os principais endpoints.
 - `docker-compose.yml`: orquestra MinIO, API e job Spark em containers.
 
 ## Pipeline de Dados
@@ -71,7 +72,7 @@ s3a://fraudes/gold/alertas_fraude/
 s3a://fraudes/gold/data_quality/
 ```
 
-A camada Gold é particionada por `data_processamento` e `risk_level`.
+A camada `gold/alertas_fraude/` é particionada por `data_processamento` e `risk_level`. A camada `gold/data_quality/` é particionada por `data_processamento`.
 
 ## Tecnologias
 
@@ -92,6 +93,8 @@ A camada Gold é particionada por `data_processamento` e `risk_level`.
 ├── backend/
 │   ├── api.py
 │   ├── Dockerfile
+│   ├── fraud_queries.py
+│   ├── tests/
 │   └── requirements.txt
 ├── frontend/
 │   ├── public/
@@ -102,7 +105,12 @@ A camada Gold é particionada por `data_processamento` e `risk_level`.
 ├── spark/
 │   ├── app_spark.py
 │   ├── Dockerfile
+│   ├── seeds/
+│   │   ├── usuarios.csv
+│   │   └── cenarios_fraude.csv
 │   └── requirements.txt
+├── scripts/
+│   └── validate_e2e.py
 ├── docker-compose.yml
 └── README.md
 ```
@@ -122,6 +130,8 @@ Esse comando inicia:
 - MinIO em `http://localhost:9001`
 - API FastAPI em `http://localhost:8000`
 - Job Spark que gera e grava os dados no bucket `fraudes`
+
+O Spark é executado como job batch. A API só retorna alertas após o job finalizar e gravar as camadas Parquet no MinIO.
 
 Credenciais padrão do MinIO:
 
@@ -194,6 +204,18 @@ python app_spark.py
 
 Em execução local fora do Docker, ajuste o endpoint S3A em `spark/app_spark.py` caso necessário, pois o código usa `http://minio:9000`, nome resolvido pela rede do Docker Compose.
 
+Variáveis de ambiente suportadas pelo Spark:
+
+```text
+TRANSACTION_COUNT=1000000
+FRAUD_BUCKET=fraudes
+USER_SEED_PATH=/app/seeds/usuarios.csv
+FRAUD_SCENARIOS_PATH=/app/seeds/cenarios_fraude.csv
+MINIO_ENDPOINT_URL=http://minio:9000
+MINIO_ACCESS_KEY=admin
+MINIO_SECRET_KEY=admin123
+```
+
 ## Execução Manual da API
 
 ```bash
@@ -208,6 +230,10 @@ Variáveis de ambiente suportadas:
 MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=admin
 MINIO_SECRET_KEY=admin123
+GOLD_ALERTS_PREFIX=gold/alertas_fraude/
+SILVER_TRANSACTIONS_PREFIX=silver/transacoes_enriquecidas/
+DATA_QUALITY_PREFIX=gold/data_quality/
+PARQUET_CACHE_DIR=/tmp/fraud-serving-cache
 ```
 
 ## Testes
