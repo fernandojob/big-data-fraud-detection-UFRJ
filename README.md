@@ -140,6 +140,7 @@ Endpoints disponíveis:
 GET /health
 GET /fraudes
 GET /fraudes/top
+GET /data-quality
 GET /transacoes/{id_transacao}
 GET /usuarios/{id_usuario}/historico
 GET /usuarios/{id_usuario}/perfil-risco

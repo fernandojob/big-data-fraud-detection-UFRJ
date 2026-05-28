@@ -33,6 +33,7 @@ if not client.bucket_exists(BUCKET):
 
 GOLD_ALERTS_PREFIX = os.getenv("GOLD_ALERTS_PREFIX", "gold/alertas_fraude/")
 SILVER_TRANSACTIONS_PREFIX = os.getenv("SILVER_TRANSACTIONS_PREFIX", "silver/transacoes_enriquecidas/")
+DATA_QUALITY_PREFIX = os.getenv("DATA_QUALITY_PREFIX", "gold/data_quality/")
 PARQUET_CACHE_DIR = Path(os.getenv("PARQUET_CACHE_DIR", "/tmp/fraud-serving-cache"))
 
 
@@ -181,6 +182,15 @@ def listar_fraudes(
 @app.get("/fraudes/top")
 def get_fraudes(limit: int = Query(default=50, ge=1, le=500)):
     return _listar_fraudes_filtradas(limit=limit)
+
+
+@app.get("/data-quality")
+def listar_data_quality(limit: int = Query(default=50, ge=1, le=500)):
+    return _query_parquet_prefix(
+        DATA_QUALITY_PREFIX,
+        order_by="check_name ASC",
+        limit=limit,
+    )
 
 
 @app.get("/transacoes/{id_transacao}")
